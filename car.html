@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A.H. Cars Imports - Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        /* Print layout */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
+        }
+        /* Modal animation */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.2s ease-out; }
+        .modal-leave-active { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-in; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Main Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-10 no-print">
+        <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8 flex items-center gap-3">
+            <i data-feather="truck" class="text-blue-600"></i>
+            <h1 class="text-xl md:text-2xl font-bold text-gray-900">A.H. Cars Imports</h1>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 no-print">
+        <div class="md:flex md:gap-8">
+
+            <!-- Left Column: Car List -->
+            <div id="car-list-panel" class="md:w-1/3 md:block">
+                <div class="bg-white p-4 md:p-6 rounded-xl shadow-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Car Inventory</h2>
+                        <button id="add-new-car-btn" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg">
+                            <i data-feather="plus" class="w-5 h-5"></i>
+                            <span class="hidden sm:inline">Add Car</span>
+                        </button>
+                    </div>
+                    <div id="car-list" class="space-y-3 max-h-[65vh] overflow-y-auto pr-2">
+                        <!-- Car list items will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Details Panel Wrapper -->
+            <div id="details-panel-wrapper" class="hidden md:block md:w-2/3">
+                <div id="details-panel" class="bg-white p-4 md:p-6 rounded-xl shadow-lg min-h-[75vh]">
+                    <!-- Content will be dynamically shown here -->
+                    <div id="welcome-message" class="flex flex-col items-center justify-center h-full text-center text-gray-500">
+                        <i data-feather="search" class="w-16 h-16 mb-4 text-gray-400"></i>
+                        <h3 class="text-xl font-medium">Welcome to Your Dashboard</h3>
+                        <p class="mt-1">Select a car from the list to see its details or add a new one to get started.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden modal-enter">
+        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md text-center mx-4">
+            <i data-feather="alert-triangle" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
+            <h2 class="text-2xl font-bold mb-2">Are you sure?</h2>
+            <p class="text-gray-600 mb-6">This action cannot be undone. All data for this car will be permanently deleted.</p>
+            <div class="flex justify-center gap-4">
+                <button id="cancel-delete-btn" class="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
+                <button id="confirm-delete-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Printable Report Area -->
+    <div id="print-area" class="p-8"></div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace(); 
+
+            const carListPanel = document.getElementById('car-list-panel');
+            const detailsPanelWrapper = document.getElementById('details-panel-wrapper');
+            const carListEl = document.getElementById('car-list');
+            const detailsPanelEl = document.getElementById('details-panel');
+            const addNewCarBtn = document.getElementById('add-new-car-btn');
+            const welcomeMessageEl = document.getElementById('welcome-message');
+            const deleteModal = document.getElementById('delete-modal');
+            const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+            const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+            let cars = JSON.parse(localStorage.getItem('ah_cars_data')) || [];
+            let activeCarId = null;
+            let carToDeleteId = null;
+            
+            const isMobile = () => window.innerWidth < 768;
+
+            // --- VIEW MANAGEMENT ---
+            const showListView = () => {
+                if (isMobile()) {
+                    carListPanel.classList.remove('hidden');
+                    detailsPanelWrapper.classList.add('hidden');
+                }
+                activeCarId = null;
+                renderCarList();
+                detailsPanelEl.innerHTML = '';
+                welcomeMessageEl.classList.remove('hidden');
+                feather.replace();
+            };
+
+            const showDetailsView = () => {
+                if (isMobile()) {
+                    carListPanel.classList.add('hidden');
+                    detailsPanelWrapper.classList.remove('hidden');
+                }
+            };
+
+            // --- DATA FUNCTIONS ---
+            const saveData = () => {
+                localStorage.setItem('ah_cars_data', JSON.stringify(cars));
+            };
+
+            // --- RENDER FUNCTIONS ---
+            const renderCarList = () => {
+                carListEl.innerHTML = '';
+                if (cars.length === 0) {
+                    carListEl.innerHTML = `<div class="text-center text-gray-400 py-8"><i data-feather="inbox" class="w-12 h-12 mx-auto"></i><p class="mt-2">No cars added yet.</p></div>`;
+                    feather.replace();
+                    return;
+                }
+                const sortedCars = [...cars].sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
+                sortedCars.forEach(car => {
+                    const carItem = document.createElement('div');
+                    carItem.className = `p-4 rounded-lg cursor-pointer border transition-all duration-200 ${activeCarId === car.id ? 'bg-blue-100 border-blue-500 shadow-md' : 'bg-gray-50 hover:bg-gray-100 border-transparent hover:border-gray-300'}`;
+                    carItem.dataset.id = car.id;
+                    carItem.innerHTML = `<div class="flex justify-between items-center"><div><h3 class="font-semibold text-gray-800">${car.carName} ${car.carModel}</h3><p class="text-sm text-gray-500">${car.regNumber}</p></div><i data-feather="chevron-right" class="text-gray-400"></i></div>`;
+                    carItem.addEventListener('click', () => {
+                        activeCarId = car.id;
+                        renderCarList();
+                        renderCarDetails(car.id);
+                    });
+                    carListEl.appendChild(carItem);
+                });
+                feather.replace();
+            };
+
+            const renderCarDetails = (carId) => {
+                const car = cars.find(c => c.id === carId);
+                if (!car) { showListView(); return; }
+
+                showDetailsView();
+                welcomeMessageEl.classList.add('hidden');
+
+                const totalExpenses = car.expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+                let profitLossHTML = '';
+                if (car.sellingPrice && car.sellingPrice > 0) {
+                    const profit = car.sellingPrice - totalExpenses;
+                    const profitClass = profit >= 0 ? 'green' : 'red';
+                    const profitIcon = profit >= 0 ? 'trending-up' : 'trending-down';
+                    profitLossHTML = `<div class="bg-${profitClass}-100 border-l-4 border-${profitClass}-500 text-${profitClass}-800 p-4 rounded-md flex items-center gap-3"><i data-feather="${profitIcon}" class="w-6 h-6"></i><p class="font-bold text-lg">${profit >= 0 ? 'Profit' : 'Loss'}: ${Math.abs(profit).toLocaleString('en-IN')} BDT</p></div>`;
+                }
+
+                detailsPanelEl.innerHTML = `
+                    <div class="flex items-center gap-3 mb-4 md:hidden">
+                        <button id="back-to-list-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors"><i data-feather="arrow-left" class="w-6 h-6"></i></button>
+                        <h2 class="text-xl font-bold text-gray-800">${car.carName} ${car.carModel}</h2>
+                    </div>
+                    <div class="hidden md:flex justify-between items-start mb-4">
+                        <div><h2 class="text-3xl font-bold text-gray-800">${car.carName} ${car.carModel}</h2><p class="text-gray-500">${car.regNumber}</p></div>
+                        <div class="flex gap-2"><button id="print-report-btn" class="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"><i data-feather="printer" class="w-5 h-5"></i><span>Print</span></button><button id="delete-car-btn" class="bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"><i data-feather="trash-2" class="w-5 h-5"></i><span>Delete</span></button></div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg border grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm"><div><strong>Entry Date:</strong> ${new Date(car.entryDate).toLocaleDateString()}</div><div><strong>Owner:</strong> ${car.ownerName}</div><div><strong>Owner Phone:</strong> ${car.ownerPhone}</div></div>
+                    <div class="mb-6"><h3 class="text-xl font-semibold mb-3">Expenses</h3><div id="expense-list" class="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2">${car.expenses.map(exp => `<div class="flex justify-between items-center bg-gray-50 p-3 rounded-md border"><span class="text-gray-700">${exp.description}</span><span class="font-medium">${parseFloat(exp.amount).toLocaleString('en-IN')} BDT</span></div>`).join('') || '<p class="text-gray-500 text-center py-4">No expenses added yet.</p>'}</div><div class="flex justify-end font-bold text-lg bg-gray-100 p-3 rounded-lg border"><span>Total Expenses:</span><span class="ml-4">${totalExpenses.toLocaleString('en-IN')} BDT</span></div><form id="expense-form" class="mt-4 flex flex-col sm:flex-row gap-3"><input type="text" name="description" placeholder="Expense Description" class="flex-grow border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><input type="number" name="amount" placeholder="Amount (BDT)" class="sm:w-40 border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"><i data-feather="plus" class="w-5 h-5"></i>Add</button></form></div>
+                    <div class="mb-6"><h3 class="text-xl font-semibold mb-3">Sale Information</h3><div class="bg-gray-100 p-3 rounded-lg border mb-4"><p><strong>Selling Price:</strong> ${car.sellingPrice ? car.sellingPrice.toLocaleString('en-IN') + ' BDT' : 'Not set'}</p></div><form id="sale-form" class="flex flex-col sm:flex-row gap-3"><input type="number" name="sellingPrice" placeholder="Selling Price (BDT)" class="flex-grow border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2"><i data-feather="tag" class="w-5 h-5"></i>Set Price</button></form></div>
+                    ${profitLossHTML}
+                    <div class="mt-6 flex gap-2 md:hidden"><button id="print-report-btn-mobile" class="flex-1 bg-gray-600 text-white px-3 py-3 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"><i data-feather="printer" class="w-5 h-5"></i><span>Print</span></button><button id="delete-car-btn-mobile" class="flex-1 bg-red-500 text-white px-3 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"><i data-feather="trash-2" class="w-5 h-5"></i><span>Delete</span></button></div>
+                `;
+
+                feather.replace();
+                document.getElementById('expense-form').addEventListener('submit', handleAddExpense);
+                document.getElementById('sale-form').addEventListener('submit', handleSetSalePrice);
+                document.getElementById('print-report-btn').addEventListener('click', () => handlePrintReport(car.id));
+                document.getElementById('delete-car-btn').addEventListener('click', () => { carToDeleteId = car.id; showDeleteModal(); });
+                // Mobile buttons
+                document.getElementById('back-to-list-btn')?.addEventListener('click', showListView);
+                document.getElementById('print-report-btn-mobile')?.addEventListener('click', () => handlePrintReport(car.id));
+                document.getElementById('delete-car-btn-mobile')?.addEventListener('click', () => { carToDeleteId = car.id; showDeleteModal(); });
+            };
+            
+            const renderAddCarForm = () => {
+                showDetailsView();
+                activeCarId = null;
+                renderCarList();
+                welcomeMessageEl.classList.add('hidden');
+
+                detailsPanelEl.innerHTML = `
+                    <div class="flex items-center gap-3 mb-6 md:hidden">
+                        <button id="cancel-add-car-mobile" class="p-2 rounded-full hover:bg-gray-200 transition-colors"><i data-feather="arrow-left" class="w-6 h-6"></i></button>
+                        <h2 class="text-xl font-bold">Add New Car</h2>
+                    </div>
+                    <h2 class="hidden md:block text-2xl font-bold mb-6">Add a New Car</h2>
+                    <form id="add-car-form" class="space-y-4"><input type="text" name="carName" placeholder="Car Name (e.g., Toyota)" class="w-full border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><input type="text" name="carModel" placeholder="Car Model (e.g., Corolla)" class="w-full border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><input type="text" name="regNumber" placeholder="Registration Number" class="w-full border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><input type="text" name="ownerName" placeholder="Current Owner's Name" class="w-full border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><input type="tel" name="ownerPhone" placeholder="Current Owner's Phone" class="w-full border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 transition" required><div class="flex justify-end gap-3 pt-4"><button type="button" id="cancel-add-car" class="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button><button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">Save Car</button></div></form>
+                `;
+                feather.replace();
+                document.getElementById('add-car-form').addEventListener('submit', handleAddCar);
+                document.getElementById('cancel-add-car').addEventListener('click', showListView);
+                document.getElementById('cancel-add-car-mobile')?.addEventListener('click', showListView);
+            };
+
+            // --- MODAL FUNCTIONS ---
+            const showDeleteModal = () => { deleteModal.classList.remove('hidden'); setTimeout(() => deleteModal.classList.add('modal-enter-active'), 10); };
+            const hideDeleteModal = () => { deleteModal.classList.remove('modal-enter-active'); deleteModal.classList.add('modal-leave-active'); setTimeout(() => { deleteModal.classList.add('hidden'); deleteModal.classList.remove('modal-leave-active'); }, 200); };
+
+            // --- EVENT HANDLERS ---
+            const handleAddCar = (e) => { e.preventDefault(); const formData = new FormData(e.target); const newCar = { id: Date.now().toString(), entryDate: new Date().toISOString(), carName: formData.get('carName'), carModel: formData.get('carModel'), regNumber: formData.get('regNumber'), ownerName: formData.get('ownerName'), ownerPhone: formData.get('ownerPhone'), expenses: [], sellingPrice: null }; cars.push(newCar); saveData(); activeCarId = newCar.id; renderCarList(); renderCarDetails(newCar.id); };
+            const handleDeleteCar = () => { if (!carToDeleteId) return; cars = cars.filter(car => car.id !== carToDeleteId); saveData(); hideDeleteModal(); if (activeCarId === carToDeleteId) { activeCarId = null; showListView(); } carToDeleteId = null; renderCarList(); };
+            const handleAddExpense = (e) => { e.preventDefault(); if (!activeCarId) return; const car = cars.find(c => c.id === activeCarId); const formData = new FormData(e.target); const newExpense = { description: formData.get('description'), amount: parseFloat(formData.get('amount')) }; if (newExpense.description && newExpense.amount > 0) { car.expenses.push(newExpense); saveData(); renderCarDetails(activeCarId); } };
+            const handleSetSalePrice = (e) => { e.preventDefault(); if (!activeCarId) return; const car = cars.find(c => c.id === activeCarId); const formData = new FormData(e.target); const sellingPrice = parseFloat(formData.get('sellingPrice')); if (sellingPrice > 0) { car.sellingPrice = sellingPrice; saveData(); renderCarDetails(activeCarId); } };
+            const handlePrintReport = (carId) => { const car = cars.find(c => c.id === carId); if (!car) return; const printArea = document.getElementById('print-area'); const totalExpenses = car.expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0); let profitLossHTML = ''; if (car.sellingPrice && car.sellingPrice > 0) { const profit = car.sellingPrice - totalExpenses; profitLossHTML = `<div class="mt-4 pt-4 border-t"><p class="text-lg"><strong>Selling Price:</strong> ${car.sellingPrice.toLocaleString('en-IN')} BDT</p></div><div class="mt-4 p-4 rounded-md ${profit >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}"><p class="text-xl font-bold">${profit >= 0 ? 'Profit' : 'Loss'}: ${Math.abs(profit).toLocaleString('en-IN')} BDT</p></div>`; } printArea.innerHTML = `<div class="max-w-4xl mx-auto p-4"><h1 class="text-4xl font-bold text-center mb-8">A.H. Cars Imports</h1><h2 class="text-2xl font-semibold border-b pb-2 mb-4">Car Details</h2><div class="grid grid-cols-2 gap-x-8 gap-y-2 text-lg mb-6"><p><strong>Date of Entry:</strong> ${new Date(car.entryDate).toLocaleDateString()}</p><p><strong>Car:</strong> ${car.carName} ${car.carModel}</p><p><strong>Registration No:</strong> ${car.regNumber}</p><p><strong>Owner:</strong> ${car.ownerName}</p><p><strong>Owner Phone:</strong> ${car.ownerPhone}</p></div><h2 class="text-2xl font-semibold border-b pb-2 mb-4">Expense Report</h2><table class="w-full text-left mb-4"><thead><tr class="bg-gray-200"><th class="p-2">Description</th><th class="p-2 text-right">Amount (BDT)</th></tr></thead><tbody>${car.expenses.map(exp => `<tr class="border-b"><td class="p-2">${exp.description}</td><td class="p-2 text-right">${parseFloat(exp.amount).toLocaleString('en-IN')}</td></tr>`).join('')}</tbody></table><div class="flex justify-end text-xl font-bold bg-gray-200 p-3"><span>Total Expenses:</span><span class="ml-4">${totalExpenses.toLocaleString('en-IN')} BDT</span></div>${profitLossHTML}</div>`; window.print(); };
+            
+            // --- INITIALIZATION ---
+            addNewCarBtn.addEventListener('click', renderAddCarForm);
+            cancelDeleteBtn.addEventListener('click', hideDeleteModal);
+            confirmDeleteBtn.addEventListener('click', handleDeleteCar);
+            
+            // Handle window resize to switch between mobile and desktop views
+            window.addEventListener('resize', () => {
+                if (!isMobile()) {
+                    carListPanel.classList.remove('hidden');
+                    detailsPanelWrapper.classList.remove('hidden');
+                } else {
+                    if (activeCarId) {
+                        carListPanel.classList.add('hidden');
+                        detailsPanelWrapper.classList.remove('hidden');
+                    } else {
+                        carListPanel.classList.remove('hidden');
+                        detailsPanelWrapper.classList.add('hidden');
+                    }
+                }
+            });
+
+            // Initial render
+            if (isMobile()) {
+                detailsPanelWrapper.classList.add('hidden');
+            }
+            renderCarList();
+        });
+    </script>
+</body>
+</html>
