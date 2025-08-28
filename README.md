@@ -3,7 +3,7 @@
 A simple, modern, and fully responsive web application designed for small car import businesses to manage inventory, track expenses, and calculate profitability.  
 This application is built entirely with frontend technologies (**HTML, CSS, and JavaScript**) and uses the **browser's local storage** to save data, requiring **no backend or external database**.  
 
-🔗 **[Live Demo](https://your-github-username.github.io/your-repo-name/)** <!-- Replace with your actual GitHub Pages link -->
+🔗 **[Live Demo](https://mmnayon00.github.io/A.H.-Cars-Imports--Management-System/)** <!-- Replace with your actual GitHub Pages link -->
 
 ---
 
